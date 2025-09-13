@@ -16,18 +16,38 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useDemoContext } from '@/components/demo/DemoProvider';
+import { useAuth } from '@/hooks/useAuth';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-const Dashboard = () => {
-  const { demoUser, connectDemoWallet, updateVerificationStep } = useDemoContext();
+const DashboardContent = () => {
+  const { demoUser, connectDemoWallet, updateVerificationStep, isDemo } = useDemoContext();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isConnectingWallet, setIsConnectingWallet] = useState(false);
 
-  if (!demoUser) {
-    navigate('/auth');
-    return null;
-  }
+  // Use demo user if in demo mode, otherwise use authenticated user data
+  const currentUser = isDemo ? demoUser : {
+    id: user?.id || '',
+    email: user?.email || '',
+    name: user?.user_metadata?.display_name || 'User',
+    walletAddress: '',
+    kycStatus: 'pending' as const,
+    documents: [],
+    verificationStep: 1,
+    createdAt: new Date(),
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast.error('Error signing out');
+    } else {
+      toast.success('Signed out successfully');
+      navigate('/auth');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -54,13 +74,13 @@ const Dashboard = () => {
     setTimeout(() => {
       connectDemoWallet();
       toast.success('Demo wallet connected successfully!');
-      updateVerificationStep(Math.max(demoUser.verificationStep, 3));
+      updateVerificationStep(Math.max(currentUser.verificationStep, 3));
       setIsConnectingWallet(false);
     }, 2000);
   };
 
   const getProgressPercentage = () => {
-    const step = demoUser.verificationStep;
+    const step = currentUser.verificationStep;
     return Math.min((step / 4) * 100, 100);
   };
 
@@ -69,8 +89,12 @@ const Dashboard = () => {
   };
 
   const handleLogout = () => {
-    toast.success('Logged out successfully');
-    navigate('/auth');
+    if (isDemo) {
+      toast.success('Logged out successfully');
+      navigate('/auth');
+    } else {
+      handleSignOut();
+    }
   };
 
   return (
@@ -91,8 +115,8 @@ const Dashboard = () => {
             
             <div className="flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-white">{demoUser.name}</p>
-                <p className="text-xs text-muted-foreground">{demoUser.email}</p>
+                <p className="text-sm font-medium text-white">{currentUser.name}</p>
+                <p className="text-xs text-muted-foreground">{currentUser.email}</p>
               </div>
               <Button
                 variant="ghost"
@@ -114,15 +138,15 @@ const Dashboard = () => {
           <Card className="kyc-card p-6 border-white/10">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-white">KYC Status</h3>
-              {getStatusIcon(demoUser.kycStatus)}
+              {getStatusIcon(currentUser.kycStatus)}
             </div>
             <div className="space-y-3">
-              <Badge className={`${getStatusColor(demoUser.kycStatus)} capitalize`}>
-                {demoUser.kycStatus}
+              <Badge className={`${getStatusColor(currentUser.kycStatus)} capitalize`}>
+                {currentUser.kycStatus}
               </Badge>
               <Progress value={getProgressPercentage()} className="h-2" />
               <p className="text-xs text-muted-foreground">
-                Step {demoUser.verificationStep} of 4 completed
+                Step {currentUser.verificationStep} of 4 completed
               </p>
             </div>
           </Card>
@@ -134,11 +158,11 @@ const Dashboard = () => {
               <Wallet className="h-5 w-5 text-primary" />
             </div>
             <div className="space-y-3">
-              {demoUser.walletAddress ? (
+              {currentUser.walletAddress ? (
                 <>
                   <Badge className="bg-kyc-success text-white">Connected</Badge>
                   <p className="text-xs text-muted-foreground font-mono break-all">
-                    {demoUser.walletAddress}
+                    {currentUser.walletAddress}
                   </p>
                 </>
               ) : (
@@ -169,13 +193,13 @@ const Dashboard = () => {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Uploaded</span>
                 <span className="text-sm font-medium text-white">
-                  {demoUser.documents.length}
+                  {currentUser.documents.length}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Verified</span>
                 <span className="text-sm font-medium text-white">
-                  {demoUser.documents.filter(d => d.status === 'verified').length}
+                  {currentUser.documents.filter(d => d.status === 'verified').length}
                 </span>
               </div>
             </div>
@@ -229,8 +253,8 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-white mb-6">Recent Activity</h3>
           
           <div className="space-y-4">
-            {demoUser.documents.length > 0 ? (
-              demoUser.documents.slice(0, 3).map((doc) => (
+            {currentUser.documents.length > 0 ? (
+              currentUser.documents.slice(0, 3).map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                   <div className="flex items-center space-x-3">
                     <FileText className="h-5 w-5 text-primary" />
@@ -280,5 +304,11 @@ const Dashboard = () => {
     </div>
   );
 };
+
+const Dashboard = () => (
+  <ProtectedRoute>
+    <DashboardContent />
+  </ProtectedRoute>
+);
 
 export default Dashboard;

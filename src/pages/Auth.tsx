@@ -1,31 +1,88 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Eye, EyeOff, Wallet } from 'lucide-react';
+import { Shield, Eye, EyeOff, Wallet, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useDemoContext } from '@/components/demo/DemoProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  
   const { demoUser } = useDemoContext();
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (user && !isDemoMode) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate, isDemoMode]);
+
   const handleDemoLogin = () => {
+    setIsDemoMode(true);
     toast.success('Demo account logged in successfully!');
     navigate('/dashboard');
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === 'demo@decentrakyc.com' || email === '') {
-      handleDemoLogin();
-    } else {
-      toast.error('This is a demo. Please use the demo account.');
+    setIsLoading(true);
+    
+    try {
+      const { error } = await signIn(email, password);
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Invalid email or password. Please try again.');
+        } else if (error.message.includes('Email not confirmed')) {
+          toast.error('Please check your email and click the confirmation link.');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.success('Signed in successfully!');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { error } = await signUp(signUpEmail, signUpPassword, signUpName);
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          toast.error('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('Password should be at least 6 characters')) {
+          toast.error('Password must be at least 6 characters long.');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.success('Account created! Please check your email to confirm your account.');
+        setSignUpEmail('');
+        setSignUpPassword('');
+        setSignUpName('');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,9 +114,9 @@ const Auth = () => {
           <div className="flex items-center space-x-3">
             <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
             <div>
-              <p className="text-sm font-medium text-white">Demo Mode Active</p>
+              <p className="text-sm font-medium text-white">Real Authentication Available</p>
               <p className="text-xs text-muted-foreground">
-                Full KYC simulation ready for demonstration
+                Create an account or use demo mode for testing
               </p>
             </div>
           </div>
@@ -127,9 +184,13 @@ const Auth = () => {
 
                 <Button 
                   type="submit" 
+                  disabled={isLoading}
                   className="w-full gradient-primary text-white font-medium transition-smooth hover:kyc-glow"
                 >
-                  Sign In
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  {isLoading ? 'Signing In...' : 'Sign In'}
                 </Button>
 
                 <Button 
@@ -152,12 +213,15 @@ const Auth = () => {
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white">Full Name</label>
                   <Input
                     type="text"
                     placeholder="Enter your full name"
+                    value={signUpName}
+                    onChange={(e) => setSignUpName(e.target.value)}
+                    required
                     className="bg-white/5 border-white/20 text-white placeholder:text-muted-foreground focus:border-primary"
                   />
                 </div>
@@ -167,6 +231,9 @@ const Auth = () => {
                   <Input
                     type="email"
                     placeholder="Enter your email"
+                    value={signUpEmail}
+                    onChange={(e) => setSignUpEmail(e.target.value)}
+                    required
                     className="bg-white/5 border-white/20 text-white placeholder:text-muted-foreground focus:border-primary"
                   />
                 </div>
@@ -175,19 +242,26 @@ const Auth = () => {
                   <label className="text-sm font-medium text-white">Password</label>
                   <Input
                     type="password"
-                    placeholder="Create a strong password"
+                    placeholder="Create a strong password (min 6 characters)"
+                    value={signUpPassword}
+                    onChange={(e) => setSignUpPassword(e.target.value)}
+                    required
+                    minLength={6}
                     className="bg-white/5 border-white/20 text-white placeholder:text-muted-foreground focus:border-primary"
                   />
                 </div>
 
                 <Button 
-                  type="button"
-                  onClick={handleDemoLogin}
+                  type="submit"
+                  disabled={isLoading}
                   className="w-full gradient-primary text-white font-medium transition-smooth hover:kyc-glow"
                 >
-                  Create Account (Demo)
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  {isLoading ? 'Creating Account...' : 'Create Account'}
                 </Button>
-              </div>
+              </form>
             </TabsContent>
           </Tabs>
         </Card>
@@ -195,7 +269,7 @@ const Auth = () => {
         {/* Demo Instructions */}
         <div className="text-center space-y-2">
           <p className="text-xs text-muted-foreground">
-            This is a demonstration environment. All data is simulated.
+            Test the app with demo data or create a real account
           </p>
           <Button 
             variant="link" 
