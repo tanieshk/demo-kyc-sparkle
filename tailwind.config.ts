@@ -57,6 +57,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "kyc-dark": "hsl(var(--kyc-dark))",
+        "kyc-darker": "hsl(var(--kyc-darker))",
+        "kyc-success": "hsl(var(--kyc-success))",
+        "kyc-warning": "hsl(var(--kyc-warning))",
+        "kyc-error": "hsl(var(--kyc-error))",
+        "kyc-info": "hsl(var(--kyc-info))",
       },
       borderRadius: {
         lg: "var(--radius)",
